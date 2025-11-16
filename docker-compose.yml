@@ -1,0 +1,62 @@
+version: "3.9"
+
+services:
+  vote:
+    build: ./vote
+    ports:
+      - "8080:8080"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: votes
+    depends_on:
+      - redis
+      - postgres
+
+  result:
+    build: ./result
+    ports:
+      - "8081:8081"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: votes
+    depends_on:
+      - redis
+      - postgres
+
+  worker:
+    build: ./worker
+    depends_on:
+      - redis
+      - postgres
+
+  seed-data:
+    build: ./seed-data
+    depends_on:
+      - redis
+      - postgres
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 2s
+      retries: 5
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: votes
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 3s
+      timeout: 2s
+      retries: 5
