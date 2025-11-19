@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vote-worker
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vote-worker
+  template:
+    metadata:
+      labels:
+        app: vote-worker
+    spec:
+      serviceAccountName: vote-app
+      containers:
+      - name: worker
+        image: youniss606/vote-worker:latest
+        envFrom:
+        - configMapRef:
+            name: vote-config
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+          requests:
+            cpu: "250m"
+            memory: "256Mi"
