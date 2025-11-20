@@ -1,10 +1,6 @@
 pipeline {
     agent any
 
-    tools {
-        nodejs 'nodejs-22-6-0'
-    }
-
     environment {
         KUBECONFIG_DEV  = credentials('kubeconfig-dev')
         DOCKER_REGISTRY = 'localhost:5000'
@@ -18,8 +14,7 @@ pipeline {
             steps {
                 checkout scm
                 script {
-                    env.DOCKER_IMAGE = "${env.DOCKER_REGISTRY}/voting-app:${env.GIT_COMMIT ?: 'latest'}"
-                    env.BRANCH_NAME = env.BRANCH_NAME ?: 'feature-vote'
+                    env.DOCKER_IMAGE = "${env.DOCKER_REGISTRY}/voting-app:${env.GIT_COMMIT}"
                 }
             }
         }
