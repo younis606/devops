@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: voting-redis
+  namespace: dev
 spec:
   replicas: 1
   selector:
@@ -17,3 +18,9 @@ spec:
           image: redis:7
           ports:
             - containerPort: 6379
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: voting-app-dev
+                  key: redis_password
