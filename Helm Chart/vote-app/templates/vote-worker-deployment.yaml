@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vote-worker
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: {{ .Values.replicaCountWorker }}
+  selector:
+    matchLabels:
+      app: vote-worker
+  template:
+    metadata:
+      labels:
+        app: vote-worker
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      containers:
+        - name: worker
+          image: {{ .Values.image.worker.repository }}:{{ .Values.image.worker.tag }}
+          envFrom:
+            - configMapRef:
+                name: vote-config
+          resources:
+            {{- toYaml .Values.resources.worker | nindent 12 }}
