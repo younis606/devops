@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: voting-postgres
+  namespace: vote
 spec:
   replicas: 1
   selector:
@@ -21,15 +22,15 @@ spec:
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
-                  name: voting-app
+                  name: voting-postgres-secret
                   key: postgres_user
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: voting-app
+                  name: voting-postgres-secret
                   key: postgres_password
             - name: POSTGRES_DB
               valueFrom:
                 secretKeyRef:
-                  name: voting-app
+                  name: voting-postgres-secret
                   key: postgres_db
