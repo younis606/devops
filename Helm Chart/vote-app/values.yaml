@@ -1,0 +1,52 @@
+replicaCountApp: 2
+replicaCountWorker: 1
+
+image:
+  app:
+    repository: youniss606/voting-app
+    tag: latest
+  worker:
+    repository: youniss606/vote-worker
+    tag: latest
+
+namespace: dev
+serviceAccount:
+  create: true
+  name: vote-app
+
+postgres:
+  host: postgres
+  port: 5432
+  user: voting
+  password: votingpass
+  db: votingdb
+
+redis:
+  host: redis
+  port: 6379
+  password: redispass
+
+ingress:
+  enabled: true
+  hosts:
+    - host: vote.dev.local
+      paths:
+        - /
+  annotations:
+    kubernetes.io/ingress.class: traefik
+
+resources:
+  app:
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+    requests:
+      cpu: "250m"
+      memory: "256Mi"
+  worker:
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+    requests:
+      cpu: "250m"
+      memory: "256Mi"
