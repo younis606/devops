@@ -6,7 +6,7 @@ metadata:
     kubernetes.io/ingress.class: "traefik"
 spec:
   rules:
-    - host: vote.local
+    - host: vote.dev.local
       http:
         paths:
           - path: /
@@ -16,3 +16,4 @@ spec:
                 name: voting-app
                 port:
                   number: 80
+    
