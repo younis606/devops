@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: voting-app
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: {{ .Values.replicaCountApp }}
+  selector:
+    matchLabels:
+      app: voting-app
+  template:
+    metadata:
+      labels:
+        app: voting-app
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      containers:
+        - name: voting-app
+          image: {{ .Values.image.app.repository }}:{{ .Values.image.app.tag }}
+          ports:
+            - containerPort: 80
+          envFrom:
+            - secretRef:
+                name: vote-app-secret
+          resources:
+            {{- toYaml .Values.resources.app | nindent 12 }}
