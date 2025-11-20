@@ -16,4 +16,4 @@ spec:
                 name: voting-app
                 port:
                   number: 80
-    
+  
