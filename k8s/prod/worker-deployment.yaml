@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: vote-worker
-  namespace: default
+  namespace: vote
 spec:
   replicas: 1
   selector:
@@ -12,18 +12,15 @@ spec:
     metadata:
       labels:
         app: vote-worker
+      annotations:
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "vote-app"
+        vault.hashicorp.com/agent-inject-secret: "secret/data/voting-app"
     spec:
       serviceAccountName: vote-app
       containers:
-      - name: worker
-        image: youniss606/vote-worker:latest
-        envFrom:
-        - configMapRef:
-            name: vote-config
-        resources:
-          limits:
-            cpu: "500m"
-            memory: "512Mi"
-          requests:
-            cpu: "250m"
-            memory: "256Mi"
+        - name: worker
+          image: youniss606/vote-worker:latest
+          envFrom:
+            - configMapRef:
+                name: vote-config
