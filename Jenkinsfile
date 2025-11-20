@@ -13,11 +13,11 @@ pipeline {
     }
 
     stages {
+
         stage('Checkout') {
             steps {
                 checkout scm
                 script {
-                    // تعيين متغير Docker image بعد checkout
                     env.DOCKER_IMAGE = "${env.DOCKER_REGISTRY}/voting-app:${env.GIT_COMMIT}"
                 }
             }
@@ -51,29 +51,25 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                script {
-                    sh "docker build -t ${env.DOCKER_IMAGE} ."
-                }
+                sh "docker build -t ${env.DOCKER_IMAGE} ."
             }
         }
 
         stage('Trivy Scan') {
             steps {
-                script {
-                    sh """
-                    trivy image ${env.DOCKER_IMAGE} \
-                      --severity CRITICAL,HIGH \
-                      --exit-code 1 \
-                      --format json -o trivy-image-results.json
-                    """
-                }
+                sh """
+                trivy image ${env.DOCKER_IMAGE} \
+                  --severity CRITICAL,HIGH \
+                  --exit-code 1 \
+                  --format json -o trivy-image-results.json
+                """
             }
         }
 
         stage('Push Docker Image') {
             steps {
                 script {
-                    withDockerRegistry([credentialsId: 'docker-hub-credentials', url: "http://${DOCKER_REGISTRY}"]) {
+                    withDockerRegistry([credentialsId: 'docker-hub-credentials', url: "http://${env.DOCKER_REGISTRY}"]) {
                         sh "docker push ${env.DOCKER_IMAGE}"
                     }
                 }
@@ -82,30 +78,26 @@ pipeline {
 
         stage('Deploy via Helm (Dev)') {
             steps {
-                script {
-                    sh """
-                    helm upgrade --install ${HELM_RELEASE} ${HELM_CHART_PATH} \
-                      --namespace vote --create-namespace \
-                      --kubeconfig ${KUBECONFIG_DEV} \
-                      --values ${HELM_CHART_PATH}/values.yaml
-                    """
-                }
+                sh """
+                helm upgrade --install ${HELM_RELEASE} ${HELM_CHART_PATH} \
+                  --namespace vote --create-namespace \
+                  --kubeconfig ${KUBECONFIG_DEV} \
+                  --values ${HELM_CHART_PATH}/values.yaml
+                """
             }
         }
 
         stage('Smoke Test') {
             steps {
-                script {
-                    sh """
-                    HTTP_STATUS=\$(curl -s -o /dev/null -w "%{http_code}" http://vote.local/)
-                    if [ "\$HTTP_STATUS" -ne 200 ]; then
-                        echo "Smoke test failed! Status code: \$HTTP_STATUS"
-                        exit 1
-                    else
-                        echo "Smoke test passed! Status code: \$HTTP_STATUS"
-                    fi
-                    """
-                }
+                sh """
+                HTTP_STATUS=\$(curl -s -o /dev/null -w "%{http_code}" http://vote.local/)
+                if [ "\$HTTP_STATUS" -ne 200 ]; then
+                    echo "Smoke test failed! Status code: \$HTTP_STATUS"
+                    exit 1
+                else
+                    echo "Smoke test passed! Status code: \$HTTP_STATUS"
+                fi
+                """
             }
         }
 
@@ -148,7 +140,9 @@ pipeline {
         }
 
         stage('IaC Workflow / Prod Deployment via GitOps') {
-            when { branch 'main' }
+            when {
+                expression { env.BRANCH_NAME == 'main' }
+            }
             steps {
                 echo "Production deployment handled via GitOps automation (ArgoCD / FluxCD)"
             }
@@ -159,6 +153,7 @@ pipeline {
         always {
             echo "Cleaning workspace and publishing reports"
             junit allowEmptyResults: true, testResults: 'test-results.xml'
+
             publishHTML([
                 allowMissing: true,
                 alwaysLinkToLastBuild: true,
