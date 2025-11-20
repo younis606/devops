@@ -17,6 +17,7 @@ pipeline {
             steps {
                 checkout scm
                 script {
+                    // تعيين متغير Docker image بعد checkout
                     env.DOCKER_IMAGE = "${env.DOCKER_REGISTRY}/voting-app:${env.GIT_COMMIT}"
                 }
             }
