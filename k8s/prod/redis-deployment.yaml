@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: voting-redis
+  namespace: vote
 spec:
   replicas: 1
   selector:
@@ -21,5 +22,5 @@ spec:
             - name: REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: voting-app
+                  name: voting-redis-secret
                   key: redis_password
