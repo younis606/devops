@@ -18,7 +18,8 @@ pipeline {
             steps {
                 checkout scm
                 script {
-                    env.DOCKER_IMAGE = "${env.DOCKER_REGISTRY}/voting-app:${env.GIT_COMMIT}"
+                    env.DOCKER_IMAGE = "${env.DOCKER_REGISTRY}/voting-app:${env.GIT_COMMIT ?: 'latest'}"
+                    env.BRANCH_NAME = env.BRANCH_NAME ?: 'feature-vote'
                 }
             }
         }
@@ -37,13 +38,13 @@ pipeline {
 
         stage('Unit Testing') {
             steps {
-                sh 'npm test || true'
+                sh 'npm test'
             }
         }
 
         stage('Code Coverage') {
             steps {
-                catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE', message: 'Coverage issues') {
                     sh 'npm run coverage'
                 }
             }
@@ -60,9 +61,8 @@ pipeline {
                 sh """
                 trivy image ${env.DOCKER_IMAGE} \
                   --severity CRITICAL,HIGH \
-                  --ignore-unfixed \
-                  --format json \
-                  -o trivy-image-results.json || true
+                  --exit-code 1 \
+                  --format json -o trivy-image-results.json
                 """
             }
         }
@@ -79,13 +79,12 @@ pipeline {
 
         stage('Deploy via Helm (Dev)') {
             steps {
-                withEnv(["KUBECONFIG=${KUBECONFIG_DEV}"]) {
-                    sh """
-                    helm upgrade --install ${HELM_RELEASE} ${HELM_CHART_PATH} \
-                      --namespace vote --create-namespace \
-                      --values ${HELM_CHART_PATH}/values.yaml
-                    """
-                }
+                sh """
+                helm upgrade --install ${HELM_RELEASE} ${HELM_CHART_PATH} \
+                  --namespace vote --create-namespace \
+                  --kubeconfig ${KUBECONFIG_DEV} \
+                  --values ${HELM_CHART_PATH}/values.yaml
+                """
             }
         }
 
@@ -109,14 +108,10 @@ pipeline {
             }
             steps {
                 sh """
-                rm -rf vote-app-gitops
                 git clone -b main http://git-server:5555/your-org/vote-app-gitops
-
                 cd vote-app-gitops/kubernetes
                 git checkout -b feature-${BUILD_ID}
-
                 sed -i "s#image: .*#image: ${env.DOCKER_IMAGE}#g" deployment.yml
-
                 git add .
                 git commit -m "Update vote-app image to ${env.GIT_COMMIT}"
                 git push origin feature-${BUILD_ID}
@@ -129,21 +124,19 @@ pipeline {
                 expression { env.BRANCH_NAME?.startsWith('PR') }
             }
             steps {
-                withCredentials([string(credentialsId: 'gitea-token', variable: 'GITEA_TOKEN')]) {
-                    sh """
-                    curl -X POST \
-                      -H "Authorization: token ${GITEA_TOKEN}" \
-                      -H "Accept: application/json" \
-                      -H "Content-Type: application/json" \
-                      http://git-server:5555/api/v1/repos/your-org/vote-app-gitops/pulls \
-                      -d '{
-                        "title": "Update Docker Image ${env.GIT_COMMIT}",
-                        "head": "feature-${BUILD_ID}",
-                        "base": "main",
-                        "body": "Automated PR for vote-app image update"
-                      }'
-                    """
-                }
+                sh """
+                curl -X POST \
+                  -H "Authorization: token \$GITEA_TOKEN" \
+                  -H "Accept: application/json" \
+                  -H "Content-Type: application/json" \
+                  http://git-server:5555/api/v1/repos/your-org/vote-app-gitops/pulls \
+                  -d '{
+                    "title": "Update Docker Image ${env.GIT_COMMIT}",
+                    "head": "feature-${BUILD_ID}",
+                    "base": "main",
+                    "body": "Automated PR for vote-app image update"
+                  }'
+                """
             }
         }
 
@@ -160,7 +153,6 @@ pipeline {
     post {
         always {
             echo "Cleaning workspace and publishing reports"
-
             junit allowEmptyResults: true, testResults: 'test-results.xml'
 
             publishHTML([
@@ -170,16 +162,17 @@ pipeline {
                 reportDir: 'coverage/lcov-report',
                 reportFiles: 'index.html',
                 reportName: 'Code Coverage HTML Report',
+                reportTitles: '',
                 useWrapperFileDirectly: true
             ])
         }
 
         failure {
-            echo "Pipeline failed!"
+            echo "Pipeline failed! Check logs above."
         }
 
         success {
-            echo "Pipeline completed successfully!"
+            echo "Vote-app pipeline completed successfully!"
         }
     }
 }
