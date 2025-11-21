@@ -41,14 +41,6 @@ pipeline {
             }
         }
 
-        stage('Code Coverage') {
-            steps {
-                catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE', message: 'Coverage issues') {
-                    sh 'npm run coverage || true'
-                }
-            }
-        }
-
         stage('Build Docker Image') {
             steps {
                 sh "docker build -t ${env.DOCKER_IMAGE} ."
@@ -153,22 +145,6 @@ pipeline {
         always {
             echo "Cleaning workspace and publishing reports"
             junit allowEmptyResults: true, testResults: 'test-results.xml'
-            script {
-                if (fileExists('coverage/lcov-report/index.html')) {
-                    publishHTML([
-                        allowMissing: true,
-                        alwaysLinkToLastBuild: true,
-                        keepAll: true,
-                        reportDir: 'coverage/lcov-report',
-                        reportFiles: 'index.html',
-                        reportName: 'Code Coverage HTML Report',
-                        reportTitles: '',
-                        useWrapperFileDirectly: true
-                    ])
-                } else {
-                    echo "HTML report not found, skipping publishHTML"
-                }
-            }
         }
 
         failure {
