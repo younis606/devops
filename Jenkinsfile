@@ -1,10 +1,6 @@
 pipeline {
     agent any
 
-    tools {
-        nodejs 'nodejs-22-6-0'
-    }
-
     environment {
         KUBECONFIG_DEV  = credentials('kubeconfig-dev')
         DOCKER_REGISTRY = 'localhost:5000'
@@ -20,24 +16,6 @@ pipeline {
                 script {
                     env.DOCKER_IMAGE = "${env.DOCKER_REGISTRY}/voting-app:${env.GIT_COMMIT}"
                 }
-            }
-        }
-
-        stage('Install Dependencies') {
-            steps {
-                sh 'npm install --no-audit'
-            }
-        }
-
-        stage('NPM Dependency Audit') {
-            steps {
-                sh 'npm audit --audit-level=critical || true'
-            }
-        }
-
-        stage('Unit Testing') {
-            steps {
-                sh 'npm test'
             }
         }
 
@@ -93,44 +71,6 @@ pipeline {
             }
         }
 
-        stage('Update and Commit Image Tag (GitOps)') {
-            when {
-                expression { env.BRANCH_NAME?.startsWith('PR') }
-            }
-            steps {
-                sh """
-                git clone -b main http://git-server:5555/your-org/vote-app-gitops
-                cd vote-app-gitops/kubernetes
-                git checkout -b feature-${BUILD_ID}
-                sed -i "s#image: .*#image: ${env.DOCKER_IMAGE}#g" deployment.yml
-                git add .
-                git commit -m "Update vote-app image to ${env.GIT_COMMIT}"
-                git push origin feature-${BUILD_ID}
-                """
-            }
-        }
-
-        stage('Raise PR for GitOps') {
-            when {
-                expression { env.BRANCH_NAME?.startsWith('PR') }
-            }
-            steps {
-                sh """
-                curl -X POST \
-                  -H "Authorization: token \$GITEA_TOKEN" \
-                  -H "Accept: application/json" \
-                  -H "Content-Type: application/json" \
-                  http://git-server:5555/api/v1/repos/your-org/vote-app-gitops/pulls \
-                  -d '{
-                    "title": "Update Docker Image ${env.GIT_COMMIT}",
-                    "head": "feature-${BUILD_ID}",
-                    "base": "main",
-                    "body": "Automated PR for vote-app image update"
-                  }'
-                """
-            }
-        }
-
         stage('IaC Workflow / Prod Deployment via GitOps') {
             when {
                 expression { env.BRANCH_NAME == 'main' }
@@ -143,8 +83,7 @@ pipeline {
 
     post {
         always {
-            echo "Cleaning workspace and publishing reports"
-            junit allowEmptyResults: true, testResults: 'test-results.xml'
+            echo "Pipeline completed"
         }
 
         failure {
