@@ -2,45 +2,57 @@ pipeline {
     agent any
 
     environment {
-        KUBECONFIG_DEV  = credentials('kubeconfig-dev')
-        DOCKER_REGISTRY = 'localhost:5000'
-        HELM_RELEASE    = 'voting-app'
-        HELM_CHART_PATH = './helm/voting-app'
+        DOCKER_IMAGE = "younis606/vote-app:${GIT_COMMIT}"
+        HELM_RELEASE = "voting-app"
+        HELM_CHART_PATH = "./Helm Chart/vote-app"
+        KUBECONFIG_DEV = credentials('kubeconfig-dev')
     }
 
     stages {
 
-        stage('Checkout') {
+        stage('Checkout Code') {
             steps {
+                echo 'Cloning repository from GitHub...'
                 checkout scm
-                script {
-                    env.DOCKER_IMAGE = "${env.DOCKER_REGISTRY}/voting-app:${env.GIT_COMMIT}"
-                }
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh "docker build -t ${env.DOCKER_IMAGE} ."
+                echo 'Building Docker image for Vote App...'
+                sh "docker build -t ${DOCKER_IMAGE} ."
             }
         }
 
         stage('Trivy Scan') {
             steps {
-                sh """
-                trivy image ${env.DOCKER_IMAGE} \
-                  --severity CRITICAL,HIGH \
-                  --exit-code 1 \
-                  --format json -o trivy-image-results.json
-                """
+                script {
+                    echo "Scanning Docker image for vulnerabilities..."
+                
+                    trivyScan(
+                        imageName: "${DOCKER_IMAGE}",
+                        severity: "HIGH,CRITICAL",
+                        exitCode: 0
+                    )
+                }
             }
         }
 
         stage('Push Docker Image') {
             steps {
                 script {
-                    withDockerRegistry([credentialsId: 'docker-hub-credentials', url: "http://${env.DOCKER_REGISTRY}"]) {
-                        sh "docker push ${env.DOCKER_IMAGE}"
+                    echo 'Pushing Docker image to Docker Hub...'
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: 'docker-hub-credentials',
+                            usernameVariable: 'DOCKER_USER',
+                            passwordVariable: 'DOCKER_PASS'
+                        )
+                    ]) {
+                        sh """
+                            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                            docker push ${DOCKER_IMAGE}
+                        """
                     }
                 }
             }
@@ -48,17 +60,21 @@ pipeline {
 
         stage('Deploy via Helm (Dev)') {
             steps {
+                echo 'Deploying to Kubernetes (Dev)...'
                 sh """
                 helm upgrade --install ${HELM_RELEASE} ${HELM_CHART_PATH} \
                   --namespace vote --create-namespace \
                   --kubeconfig ${KUBECONFIG_DEV} \
-                  --values ${HELM_CHART_PATH}/values.yaml
+                  --values ${HELM_CHART_PATH}/values.yaml \
+                  --set image.repository=younis606/vote-app \
+                  --set image.tag=${GIT_COMMIT}
                 """
             }
         }
 
         stage('Smoke Test') {
             steps {
+                echo 'Running Smoke Test...'
                 sh """
                 HTTP_STATUS=\$(curl -s -o /dev/null -w "%{http_code}" http://vote.local/)
                 if [ "\$HTTP_STATUS" -ne 200 ]; then
@@ -70,28 +86,17 @@ pipeline {
                 """
             }
         }
-
-        stage('IaC Workflow / Prod Deployment via GitOps') {
-            when {
-                expression { env.BRANCH_NAME == 'main' }
-            }
-            steps {
-                echo "Production deployment handled via GitOps automation (ArgoCD / FluxCD)"
-            }
-        }
     }
 
     post {
         always {
-            echo "Pipeline completed"
+            echo "Pipeline finished"
         }
-
         failure {
             echo "Pipeline failed! Check logs above."
         }
-
         success {
-            echo "Vote-app pipeline completed successfully!"
+            echo "Vote App pipeline completed successfully!"
         }
     }
 }
