@@ -82,6 +82,41 @@ Use these scripts in your Docker Compose configuration to ensure services are re
 - Use appropriate base images and follow Docker best practices
 - Ensure the application works end-to-end when running `docker compose up`
 - Include a seed service that can populate test data
+  
+## Design Decisions & Trade-offs
+
+Dockerized Services: Each microservice has its own Dockerfile for modularity and portability.
+Trade-off: Increases number of images to maintain but improves isolation and reproducibility.
+
+Docker Compose: Simplifies local development, networking, and orchestration.
+Trade-off: Not ideal for production; adds extra layer compared to direct Kubernetes manifests.
+
+K3d Local Kubernetes Cluster: Enables testing Helm deployments locally, simulating production.
+Trade-off: Lightweight and fast, but not suitable for production load testing.
+
+Helm Deployment: Manages Kubernetes deployments and configurations efficiently.
+Trade-off: Learning curve for Helm templates; templating mistakes can propagate across environments.
+
+Jenkins CI/CD Pipelines: Automates build, push, deploy, and smoke tests.
+Trade-off: Requires maintenance of Jenkinsfile and credentials; adds initial setup complexity.
+
+Two-tier Network Architecture: Secures backend services while keeping frontend accessible.
+Trade-off: Slightly more complex networking; requires careful configuration.
+
+Health Checks & Dependency Management: Ensures services start in proper order.
+Trade-off: Adds initial startup time; failure in one service may delay dependent services.
+
+Seed Service: Enables reproducible test data for verification.
+Trade-off: Extra maintenance overhead; must ensure test data does not interfere with production-like data.
+
+Real-time WebSocket Updates: Improves user experience for result service.
+Trade-off: Adds complexity in scaling and monitoring; requires persistent connections.
+
+Local vs Cloud Deployment: Using local K3d cluster is fast and easy for development.
+Trade-off: Lacks cloud-level resiliency, logging, and monitoring features; production deployments should use managed Kubernetes.
+
+Resource Constraints: Local development may face CPU/memory limits affecting multiple microservices running simultaneously.
+Trade-off: Testing under realistic production load is limited; better suited for functional verification than performance benchmarking.
 
 ## Data Population
 
