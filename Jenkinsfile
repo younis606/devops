@@ -3,8 +3,8 @@ pipeline {
 
     environment {
         DOCKER_IMAGE = "younis606/result:${GIT_COMMIT}"
-        HELM_RELEASE = "result-app"
-        HELM_CHART_PATH = "./Helm Chart/result"  // مسار Helm Chart الخاص بالخدمة result
+        HELM_RELEASE = "voting-app"
+        HELM_CHART_PATH = "./Helm Chart/vote-app"
         KUBECONFIG_DEV = credentials('kubeconfig-dev')
     }
 
@@ -22,25 +22,22 @@ pipeline {
             }
         }
 
-        stage('Build Docker Image (result)') {
+        stage('Build Docker Image') {
             steps {
                 sh "docker build -t ${DOCKER_IMAGE} -f result/Dockerfile result/"
             }
         }
 
-        stage('Trivy Scan (result)') {
+        stage('Trivy Scan') {
             steps {
-                script {
-                    trivyScan(
-                        imageName: "${DOCKER_IMAGE}",
-                        severity: "HIGH,CRITICAL",
-                        exitCode: 0
-                    )
-                }
+                sh """
+                docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image \
+                --severity HIGH,CRITICAL ${DOCKER_IMAGE}
+                """
             }
         }
 
-        stage('Push Docker Image (result)') {
+        stage('Push Docker Image') {
             steps {
                 withCredentials([
                     usernamePassword(
@@ -50,8 +47,8 @@ pipeline {
                     )
                 ]) {
                     sh """
-                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                        docker push ${DOCKER_IMAGE}
+                    echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                    docker push ${DOCKER_IMAGE}
                     """
                 }
             }
@@ -70,7 +67,7 @@ pipeline {
             }
         }
 
-        stage('Smoke Test (result)') {
+        stage('Smoke Test') {
             steps {
                 sh """
                 HTTP_STATUS=\$(curl -s -o /dev/null -w "%{http_code}" http://vote.local/)
@@ -90,7 +87,7 @@ pipeline {
             echo "Pipeline failed! Check logs above."
         }
         success {
-            echo "Result service pipeline completed successfully!"
+            echo "Vote App pipeline completed successfully!"
         }
     }
 }
