@@ -4,7 +4,7 @@ pipeline {
     environment {
         DOCKER_IMAGE = "younis606/vote-app:${GIT_COMMIT}"
         HELM_RELEASE = "voting-app"
-        HELM_CHART_PATH = "./Helm_Chart/vote-app"
+        HELM_CHART_PATH = "./Helm Chart/vote-app"
         KUBECONFIG_DEV = credentials('kubeconfig-dev')
     }
 
@@ -13,22 +13,30 @@ pipeline {
         stage('Checkout Code') {
             steps {
                 checkout scm
-                script {
-                    env.GIT_COMMIT = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
-                    env.DOCKER_IMAGE = "younis606/vote-app:${env.GIT_COMMIT}"
-                }
+            }
+        }
+
+        stage('Check Workspace') {
+            steps {
+                sh "ls -R"
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh "docker build -t ${DOCKER_IMAGE} ."
+                sh "docker build -t ${DOCKER_IMAGE} -f result/Dockerfile ."
             }
         }
 
         stage('Trivy Scan') {
             steps {
-                sh "trivy image --severity HIGH,CRITICAL ${DOCKER_IMAGE} || true"
+                script {
+                    trivyScan(
+                        imageName: "${DOCKER_IMAGE}",
+                        severity: "HIGH,CRITICAL",
+                        exitCode: 0
+                    )
+                }
             }
         }
 
