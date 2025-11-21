@@ -2,10 +2,7 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_IMAGE = "younis606/vote-app:${GIT_COMMIT}"
-        HELM_RELEASE = "voting-app"
-        HELM_CHART_PATH = "./Helm Chart/vote-app"
-        KUBECONFIG_DEV = credentials('kubeconfig-dev')
+        REGISTRY = "younis606"
     }
 
     stages {
@@ -16,81 +13,57 @@ pipeline {
             }
         }
 
-        stage('Check Workspace') {
+        stage('Build Services with Docker Compose') {
             steps {
-                sh "ls -R"
+                echo "Building all services using docker-compose..."
+                sh "docker-compose -f docker-compose.yml build"
             }
         }
 
-        stage('Build Docker Image') {
-            steps {
-                sh "docker build -t ${DOCKER_IMAGE} -f result/Dockerfile ."
+        stage('Push Images to Docker Hub') {
+            when {
+                expression { return env.BRANCH_NAME == 'main' || env.BRANCH_NAME == 'master' }
             }
-        }
-
-        stage('Trivy Scan') {
             steps {
                 script {
-                    trivyScan(
-                        imageName: "${DOCKER_IMAGE}",
-                        severity: "HIGH,CRITICAL",
-                        exitCode: 0
-                    )
+                    sh "docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}"
+
+                    def images = sh(
+                        script: "docker-compose config --services",
+                        returnStdout: true
+                    ).trim().split('\n')
+
+                    images.each { svc ->
+                        sh """
+                            IMAGE=${REGISTRY}/${svc}:latest
+                            docker tag ${svc}:latest \$IMAGE
+                            docker push \$IMAGE
+                        """
+                    }
                 }
             }
         }
 
-        stage('Push Docker Image') {
+        stage('Run Services') {
             steps {
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'docker-hub-credentials',
-                        usernameVariable: 'DOCKER_USER',
-                        passwordVariable: 'DOCKER_PASS'
-                    )
-                ]) {
-                    sh """
-                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                        docker push ${DOCKER_IMAGE}
-                    """
+                echo "Running all services using docker-compose..."
+                sh "docker-compose -f docker-compose.yml up -d"
+            }
+        }
+
+        stage('Security Scan (Trivy)') {
+            steps {
+                script {
+                    def images = sh(
+                        script: "docker-compose config --services",
+                        returnStdout: true
+                    ).trim().split('\n')
+
+                    images.each { svc ->
+                        sh "trivy image ${svc}:latest || true"
+                    }
                 }
             }
-        }
-
-        stage('Deploy via Helm (Dev)') {
-            steps {
-                sh """
-                helm upgrade --install ${HELM_RELEASE} ${HELM_CHART_PATH} \
-                  --namespace vote --create-namespace \
-                  --kubeconfig ${KUBECONFIG_DEV} \
-                  --values ${HELM_CHART_PATH}/values.yaml \
-                  --set image.repository=younis606/vote-app \
-                  --set image.tag=${GIT_COMMIT}
-                """
-            }
-        }
-
-        stage('Smoke Test') {
-            steps {
-                sh """
-                HTTP_STATUS=\$(curl -s -o /dev/null -w "%{http_code}" http://vote.local/)
-                if [ "\$HTTP_STATUS" -ne 200 ]; then
-                    exit 1
-                fi
-                """
-            }
-        }
-    }
-
-    post {
-        always {
-            echo "Pipeline finished"
-        }
-        failure {
-            echo "Pipeline failed! Check logs above."
-        }
-        success {
-            echo "Vote App pipeline completed successfully!"
         }
     }
 }
