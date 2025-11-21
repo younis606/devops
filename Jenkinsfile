@@ -78,7 +78,7 @@ pipeline {
         stage('Smoke Test') {
             steps {
                 sh """
-                HTTP_STATUS=\$(curl -s -o /dev/null -w "%{http_code}" http://vote.local/)
+                HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://voting-app:80/)
                 if [ "\$HTTP_STATUS" -ne 200 ]; then
                     exit 1
                 fi
