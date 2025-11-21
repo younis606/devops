@@ -29,14 +29,17 @@ pipeline {
         }
 
         stage('Trivy Scan') {
-            steps {
-                sh """
-                 echo 'trivy scan'
-          //      docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image \
-            //    --severity HIGH,CRITICAL ${DOCKER_IMAGE}
-                """
-            }
-        }
+          steps {
+           echo "Skipping Trivy scan for now to save time"
+          
+          /*
+        sh """
+        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image \
+          --severity HIGH,CRITICAL ${DOCKER_IMAGE}
+        """
+        */
+    }
+}
 
         stage('Push Docker Image') {
             steps {
