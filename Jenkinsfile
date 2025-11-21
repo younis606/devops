@@ -65,13 +65,13 @@ pipeline {
         stage('Deploy via Helm (Dev)') {
             steps {
                 sh """
-                helm upgrade --install ${HELM_RELEASE} ${HELM_CHART_PATH} \
-                  --namespace vote --create-namespace \
-                  --kubeconfig ${KUBECONFIG_DEV} \
-                  --values ${HELM_CHART_PATH}/values.yaml \
-                  --set image.repository=younis606/result \
-                  --set image.tag=${GIT_COMMIT}
-                """
+                   helm upgrade --install ${HELM_RELEASE} "${HELM_CHART_PATH}" \
+                   --namespace vote --create-namespace \
+                   --kubeconfig ${KUBECONFIG_DEV} \
+                   --values "${HELM_CHART_PATH}/values.yaml" \
+                   --set image.repository=younis606/result \
+                   --set image.tag=${GIT_COMMIT}
+                 """
             }
         }
 
