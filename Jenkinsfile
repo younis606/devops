@@ -29,49 +29,38 @@ pipeline {
         }
 
         stage('Trivy Scan') {
-          steps {
-           echo "Skipping Trivy scan for now to save time"
-          
-          /*
-        sh """
-        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image \
-          --severity HIGH,CRITICAL ${DOCKER_IMAGE}
-        """
-        */
-    }
-}
+            steps {
+                sh "docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image --severity HIGH,CRITICAL ${DOCKER_IMAGE}"
+            }
+        }
 
         stage('Push Docker Image') {
-    steps {
-        echo "Skipping Docker push for now. To enable, uncomment the commands below."
-        /*
-        withCredentials([
-            usernamePassword(
-                credentialsId: 'docker-hub-credentials',
-                usernameVariable: 'DOCKER_USER',
-                passwordVariable: 'DOCKER_PASS'
-            )
-        ]) {
-            sh """
-            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-            docker push ${DOCKER_IMAGE}
-            """
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'docker-hub-credentials',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )
+                ]) {
+                    sh """
+                    echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                    docker push ${DOCKER_IMAGE}
+                    """
+                }
+            }
         }
-        */
-    }
-}
-
 
         stage('Deploy via Helm (Dev)') {
             steps {
                 sh """
-                   helm upgrade --install ${HELM_RELEASE} "${HELM_CHART_PATH}" \
-                   --namespace vote --create-namespace \
-                   --kubeconfig ${KUBECONFIG_DEV} \
-                   --values "${HELM_CHART_PATH}/values.yaml" \
-                   --set image.repository=younis606/result \
-                   --set image.tag=${GIT_COMMIT}
-                 """
+                helm upgrade --install ${HELM_RELEASE} "${HELM_CHART_PATH}" \
+                  --namespace vote --create-namespace \
+                  --kubeconfig ${KUBECONFIG_DEV} \
+                  --values "${HELM_CHART_PATH}/values.yaml" \
+                  --set image.repository=younis606/result \
+                  --set image.tag=${GIT_COMMIT}
+                """
             }
         }
 
