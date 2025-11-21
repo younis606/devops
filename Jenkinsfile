@@ -2,9 +2,9 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_IMAGE   = "younis606/vote-app:${GIT_COMMIT}"
-        HELM_RELEASE   = "voting-app"
-        HELM_CHART_PATH = "./Helm Chart/vote-app"
+        DOCKER_IMAGE = "younis606/result:${GIT_COMMIT}"
+        HELM_RELEASE = "result-app"
+        HELM_CHART_PATH = "./Helm Chart/result"  // مسار Helm Chart الخاص بالخدمة result
         KUBECONFIG_DEV = credentials('kubeconfig-dev')
     }
 
@@ -22,17 +22,13 @@ pipeline {
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Build Docker Image (result)') {
             steps {
-                sh """
-                    docker build \
-                        -t ${DOCKER_IMAGE} \
-                        -f result/Dockerfile .
-                """
+                sh "docker build -t ${DOCKER_IMAGE} -f result/Dockerfile result/"
             }
         }
 
-        stage('Trivy Scan') {
+        stage('Trivy Scan (result)') {
             steps {
                 script {
                     trivyScan(
@@ -44,7 +40,7 @@ pipeline {
             }
         }
 
-        stage('Push Docker Image') {
+        stage('Push Docker Image (result)') {
             steps {
                 withCredentials([
                     usernamePassword(
@@ -64,24 +60,24 @@ pipeline {
         stage('Deploy via Helm (Dev)') {
             steps {
                 sh """
-                    helm upgrade --install ${HELM_RELEASE} ${HELM_CHART_PATH} \
-                        --namespace vote --create-namespace \
-                        --kubeconfig ${KUBECONFIG_DEV} \
-                        --values ${HELM_CHART_PATH}/values.yaml \
-                        --set image.repository=younis606/vote-app \
-                        --set image.tag=${GIT_COMMIT}
+                helm upgrade --install ${HELM_RELEASE} ${HELM_CHART_PATH} \
+                  --namespace vote --create-namespace \
+                  --kubeconfig ${KUBECONFIG_DEV} \
+                  --values ${HELM_CHART_PATH}/values.yaml \
+                  --set image.repository=younis606/result \
+                  --set image.tag=${GIT_COMMIT}
                 """
             }
         }
 
-        stage('Smoke Test') {
+        stage('Smoke Test (result)') {
             steps {
-                sh '''
-                    HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://vote.local/)
-                    if [ "$HTTP_STATUS" -ne 200 ]; then
-                        exit 1
-                    fi
-                '''
+                sh """
+                HTTP_STATUS=\$(curl -s -o /dev/null -w "%{http_code}" http://vote.local/)
+                if [ "\$HTTP_STATUS" -ne 200 ]; then
+                    exit 1
+                fi
+                """
             }
         }
     }
@@ -94,7 +90,7 @@ pipeline {
             echo "Pipeline failed! Check logs above."
         }
         success {
-            echo "Vote App pipeline completed successfully!"
+            echo "Result service pipeline completed successfully!"
         }
     }
 }
